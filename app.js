@@ -1,29 +1,538 @@
-// Basic JavaScript for testing structure
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 OCR App loaded successfully!');
+// OCR Application - Complete Frontend Logic
+class OCRApp {
+    constructor() {
+        this.apiKey = '';
+        this.currentFile = null;
+        this.currentJobId = null;
+        this.exchangeRate = 5.5; // Default USD to BRL
 
-    // Test button to verify structure
-    const testBtn = document.createElement('button');
-    testBtn.textContent = 'TESTE: Structure Working!';
-    testBtn.className = 'btn btn-success';
-    testBtn.style.margin = '20px';
-
-    testBtn.onclick = () => {
-        alert('✅ Cloudflare Pages structure is working!\n\n📁 Files:\n- index.html ✓\n- style.css ✓\n- app.js ✓\n- functions/process.js ✓');
-    };
-
-    // Add test button to header
-    const header = document.querySelector('.header');
-    if (header) {
-        header.appendChild(testBtn);
+        this.init();
     }
 
-    // Hide other sections for now
-    const sections = ['uploadSection', 'processingSection', 'resultsSection', 'previewSection', 'errorSection'];
-    sections.forEach(id => {
-        const element = document.getElementById(id);
-        if (element) element.style.display = 'none';
-    });
+    init() {
+        console.log('🚀 OCR App initializing...');
+        this.loadApiKey();
+        this.setupEventListeners();
+        this.fetchExchangeRate();
+        this.showCorrectSection();
+    }
 
-    console.log('🎯 Ready for testing Cloudflare Pages deployment!');
+    loadApiKey() {
+        const savedApiKey = localStorage.getItem('mistral_api_key');
+        if (savedApiKey) {
+            this.apiKey = savedApiKey;
+            document.getElementById('apiKey').value = savedApiKey;
+            this.showSection('uploadSection');
+        }
+    }
+
+    setupEventListeners() {
+        // API Key Management
+        document.getElementById('toggleApiKey').addEventListener('click', this.toggleApiKeyVisibility.bind(this));
+        document.getElementById('saveApiKey').addEventListener('click', this.saveApiKey.bind(this));
+        document.getElementById('testMode').addEventListener('click', this.enableTestMode.bind(this));
+
+        // File Upload
+        document.getElementById('selectFileBtn').addEventListener('click', () => {
+            document.getElementById('fileInput').click();
+        });
+        document.getElementById('fileInput').addEventListener('change', this.handleFileSelect.bind(this));
+        document.getElementById('removeFile').addEventListener('click', this.removeFile.bind(this));
+
+        // Drag and Drop
+        const uploadArea = document.getElementById('uploadArea');
+        uploadArea.addEventListener('dragover', this.handleDragOver.bind(this));
+        uploadArea.addEventListener('dragleave', this.handleDragLeave.bind(this));
+        uploadArea.addEventListener('drop', this.handleDrop.bind(this));
+
+        // Processing
+        document.getElementById('processBtn').addEventListener('click', this.processFile.bind(this));
+
+        // Results
+        document.getElementById('downloadBtn').addEventListener('click', this.downloadMarkdown.bind(this));
+        document.getElementById('previewBtn').addEventListener('click', this.showPreview.bind(this));
+        document.getElementById('newFileBtn').addEventListener('click', this.resetForNewFile.bind(this));
+
+        // Preview
+        document.getElementById('closePreview').addEventListener('click', this.closePreview.bind(this));
+
+        // Error Actions
+        document.getElementById('retryBtn').addEventListener('click', this.processFile.bind(this));
+        document.getElementById('newFileErrorBtn').addEventListener('click', this.resetForNewFile.bind(this));
+    }
+
+    async fetchExchangeRate() {
+        try {
+            const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+            const data = await response.json();
+            this.exchangeRate = data.rates.BRL || 5.5;
+        } catch (error) {
+            console.warn('Failed to fetch exchange rate, using default:', error);
+        }
+    }
+
+    toggleApiKeyVisibility() {
+        const apiKeyInput = document.getElementById('apiKey');
+        const toggleBtn = document.getElementById('toggleApiKey');
+        const icon = toggleBtn.querySelector('i');
+
+        if (apiKeyInput.type === 'password') {
+            apiKeyInput.type = 'text';
+            icon.className = 'fas fa-eye-slash';
+        } else {
+            apiKeyInput.type = 'password';
+            icon.className = 'fas fa-eye';
+        }
+    }
+
+    saveApiKey() {
+        const apiKey = document.getElementById('apiKey').value.trim();
+        if (!apiKey) {
+            alert('Por favor, insira uma chave da API válida.');
+            return;
+        }
+
+        this.apiKey = apiKey;
+        localStorage.setItem('mistral_api_key', apiKey);
+
+        // Show success feedback
+        const banner = document.querySelector('.info-banner');
+        banner.className = 'info-banner api-key-saved';
+        banner.innerHTML = '<i class="fas fa-check-circle"></i><span>Chave da API salva com sucesso!</span>';
+
+        setTimeout(() => {
+            this.showSection('uploadSection');
+        }, 1000);
+    }
+
+    enableTestMode() {
+        this.apiKey = 'test-mode';
+        localStorage.removeItem('mistral_api_key');
+
+        const banner = document.querySelector('.info-banner');
+        banner.className = 'info-banner';
+        banner.innerHTML = '<i class="fas fa-flask"></i><span>Modo teste ativado. Dados simulados serão usados.</span>';
+
+        setTimeout(() => {
+            this.showSection('uploadSection');
+        }, 1000);
+    }
+
+    handleDragOver(e) {
+        e.preventDefault();
+        document.getElementById('uploadArea').classList.add('dragover');
+    }
+
+    handleDragLeave(e) {
+        e.preventDefault();
+        document.getElementById('uploadArea').classList.remove('dragover');
+    }
+
+    handleDrop(e) {
+        e.preventDefault();
+        document.getElementById('uploadArea').classList.remove('dragover');
+
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            this.handleFile(files[0]);
+        }
+    }
+
+    handleFileSelect(e) {
+        const files = e.target.files;
+        if (files.length > 0) {
+            this.handleFile(files[0]);
+        }
+    }
+
+    async handleFile(file) {
+        // Validate file type
+        const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/bmp', 'image/tiff'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Tipo de arquivo não suportado. Use PDF ou imagens (PNG, JPG, WEBP, BMP, TIFF).');
+            return;
+        }
+
+        // Validate file size (50MB)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert('Arquivo muito grande. Limite máximo: 50MB');
+            return;
+        }
+
+        this.currentFile = file;
+        this.showFileInfo(file);
+
+        if (file.type === 'application/pdf') {
+            await this.calculateCost(file);
+        } else {
+            this.showImageCost();
+        }
+    }
+
+    showFileInfo(file) {
+        document.getElementById('uploadArea').style.display = 'none';
+        document.getElementById('fileInfo').style.display = 'block';
+        document.getElementById('uploadActions').style.display = 'block';
+
+        // Update file details
+        document.getElementById('fileName').textContent = file.name;
+        document.getElementById('fileSize').textContent = this.formatFileSize(file.size);
+
+        // Update file icon based on type
+        const fileIcon = document.getElementById('fileInfo').querySelector('.file-icon');
+        if (file.type === 'application/pdf') {
+            fileIcon.className = 'fas fa-file-pdf file-icon';
+            fileIcon.style.color = '#dc3545';
+        } else {
+            fileIcon.className = 'fas fa-file-image file-icon';
+            fileIcon.style.color = '#28a745';
+        }
+    }
+
+    async calculateCost(file) {
+        document.getElementById('costDisplay').style.display = 'block';
+        document.getElementById('costLoading').style.display = 'block';
+
+        try {
+            // Use PDF.js to count pages
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            const pageCount = pdf.numPages;
+
+            // Calculate cost (Mistral OCR: $1 per 1000 pages)
+            const costPer1000Pages = 1.00;
+            const costUSD = (pageCount / 1000) * costPer1000Pages;
+            const costBRL = costUSD * this.exchangeRate;
+
+            // Update UI
+            document.getElementById('costLoading').style.display = 'none';
+            document.getElementById('pageCount').textContent = pageCount;
+            document.getElementById('costUSD').textContent = `$${costUSD.toFixed(3)}`;
+            document.getElementById('costBRL').textContent = `R$${costBRL.toFixed(2)}`;
+
+            // Show value comparison
+            this.calculateValueComparison(pageCount, costBRL);
+
+        } catch (error) {
+            console.error('Error calculating cost:', error);
+            document.getElementById('costLoading').innerHTML = '<i class="fas fa-exclamation-triangle"></i> Erro ao calcular custo';
+        }
+    }
+
+    showImageCost() {
+        document.getElementById('costDisplay').style.display = 'block';
+        document.getElementById('costLoading').style.display = 'none';
+
+        // For images, assume 1 page
+        const pageCount = 1;
+        const costUSD = 0.001; // $0.001 for 1 page
+        const costBRL = costUSD * this.exchangeRate;
+
+        document.getElementById('pageCount').textContent = pageCount;
+        document.getElementById('costUSD').textContent = `$${costUSD.toFixed(3)}`;
+        document.getElementById('costBRL').textContent = `R$${costBRL.toFixed(2)}`;
+
+        this.calculateValueComparison(pageCount, costBRL);
+    }
+
+    calculateValueComparison(pages, costBRL) {
+        // Assumptions for value calculation
+        const minutesPerPage = 5; // Time to manually transcribe one page
+        const hoursToTranscribe = (pages * minutesPerPage) / 60;
+        const freelancerRatePerHour = 25; // R$ per hour for freelancer
+
+        const freelancerCost = hoursToTranscribe * freelancerRatePerHour;
+        const timeSaved = hoursToTranscribe;
+        const savings = freelancerCost - costBRL;
+
+        // Update UI
+        document.getElementById('valueComparison').style.display = 'block';
+        document.getElementById('timeSaved').textContent = `${timeSaved.toFixed(1)}h`;
+        document.getElementById('costSaved').textContent = `R$${savings.toFixed(0)}`;
+    }
+
+    removeFile() {
+        this.currentFile = null;
+        document.getElementById('uploadArea').style.display = 'block';
+        document.getElementById('fileInfo').style.display = 'none';
+        document.getElementById('uploadActions').style.display = 'none';
+        document.getElementById('fileInput').value = '';
+    }
+
+    async processFile() {
+        if (!this.currentFile) {
+            alert('Nenhum arquivo selecionado');
+            return;
+        }
+
+        if (!this.apiKey) {
+            alert('Configure a chave da API primeiro');
+            return;
+        }
+
+        this.showSection('processingSection');
+        this.currentJobId = this.generateJobId();
+
+        // Test mode simulation
+        if (this.apiKey === 'test-mode') {
+            await this.simulateProcessing();
+            return;
+        }
+
+        // Real processing
+        await this.realProcessing();
+    }
+
+    async simulateProcessing() {
+        const steps = [
+            { id: 'step1', duration: 2000, message: 'Arquivo enviado com sucesso!' },
+            { id: 'step2', duration: 5000, message: 'OCR concluído!' }
+        ];
+
+        let totalTime = 0;
+
+        for (let i = 0; i < steps.length; i++) {
+            const step = steps[i];
+
+            // Activate step
+            this.activateStep(step.id);
+
+            // Simulate progress
+            await this.animateProgress(step.id, step.duration);
+
+            // Complete step
+            this.completeStep(step.id, step.duration);
+            totalTime += step.duration;
+        }
+
+        // Show results
+        this.markdownContent = `# Exemplo de Resultado OCR
+
+Este é um exemplo de texto extraído usando OCR.
+
+## Funcionalidades Testadas
+- ✅ Upload de arquivo
+- ✅ Processamento simulado
+- ✅ Cálculo de custos
+- ✅ Interface responsiva
+
+**Arquivo:** ${this.currentFile.name}
+**Processado em:** ${(totalTime / 1000).toFixed(1)}s
+**Modo:** Teste (simulação)`;
+
+        document.getElementById('totalTime').textContent = `${(totalTime / 1000).toFixed(1)}s`;
+
+        setTimeout(() => {
+            this.showSection('resultsSection');
+        }, 1000);
+    }
+
+    async realProcessing() {
+        try {
+            const startTime = Date.now();
+
+            // Step 1: Upload and process
+            this.activateStep('step1');
+
+            const formData = new FormData();
+            formData.append('file', this.currentFile);
+
+            const response = await fetch('/process', {
+                method: 'POST',
+                headers: {
+                    'X-API-Key': this.apiKey
+                },
+                body: formData
+            });
+
+            await this.animateProgress('step1', 2000);
+            this.completeStep('step1', 2000);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            // Step 2: OCR Processing
+            this.activateStep('step2');
+
+            const result = await response.json();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Erro desconhecido no processamento');
+            }
+
+            await this.animateProgress('step2', result.timing?.ocr || 3000);
+            this.completeStep('step2', result.timing?.ocr || 3000);
+
+            // Store results
+            this.markdownContent = result.markdown;
+            const totalTime = Date.now() - startTime;
+
+            document.getElementById('totalTime').textContent = `${(totalTime / 1000).toFixed(1)}s`;
+
+            setTimeout(() => {
+                this.showSection('resultsSection');
+            }, 1000);
+
+        } catch (error) {
+            console.error('Processing error:', error);
+            this.showError(error.message);
+        }
+    }
+
+    activateStep(stepId) {
+        const step = document.getElementById(stepId);
+        step.classList.add('active');
+        step.classList.remove('completed');
+
+        // Show spinner
+        const spinner = step.querySelector('.step-spinner');
+        if (spinner) spinner.style.display = 'block';
+    }
+
+    async animateProgress(stepId, duration) {
+        const progressBar = document.getElementById(`progress${stepId.slice(-1)}`);
+        const timing = document.getElementById(`timing${stepId.slice(-1)}`);
+
+        const startTime = Date.now();
+
+        return new Promise(resolve => {
+            const interval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1) * 100;
+
+                progressBar.style.width = `${progress}%`;
+                timing.textContent = `${(elapsed / 1000).toFixed(1)}s`;
+
+                if (elapsed >= duration) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 100);
+        });
+    }
+
+    completeStep(stepId, duration) {
+        const step = document.getElementById(stepId);
+        step.classList.remove('active');
+        step.classList.add('completed');
+
+        // Hide spinner
+        const spinner = step.querySelector('.step-spinner');
+        if (spinner) spinner.style.display = 'none';
+
+        // Final timing
+        const timing = document.getElementById(`timing${stepId.slice(-1)}`);
+        timing.textContent = `Concluído em ${(duration / 1000).toFixed(1)}s`;
+    }
+
+    showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        this.showSection('errorSection');
+    }
+
+    downloadMarkdown() {
+        if (!this.markdownContent) {
+            alert('Nenhum conteúdo para download');
+            return;
+        }
+
+        const blob = new Blob([this.markdownContent], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${this.currentFile.name.split('.')[0]}.md`;
+        a.click();
+
+        URL.revokeObjectURL(url);
+    }
+
+    showPreview() {
+        if (!this.markdownContent) {
+            alert('Nenhum conteúdo para visualizar');
+            return;
+        }
+
+        const preview = document.getElementById('markdownPreview');
+        preview.innerHTML = marked.parse(this.markdownContent);
+
+        this.showSection('previewSection');
+    }
+
+    closePreview() {
+        this.showSection('resultsSection');
+    }
+
+    resetForNewFile() {
+        this.currentFile = null;
+        this.currentJobId = null;
+        this.markdownContent = '';
+
+        // Reset file input
+        document.getElementById('fileInput').value = '';
+
+        // Reset UI
+        this.showSection('uploadSection');
+        document.getElementById('uploadArea').style.display = 'block';
+        document.getElementById('fileInfo').style.display = 'none';
+        document.getElementById('uploadActions').style.display = 'none';
+
+        // Reset progress
+        ['step1', 'step2'].forEach(stepId => {
+            const step = document.getElementById(stepId);
+            step.classList.remove('active', 'completed');
+
+            const progress = document.getElementById(`progress${stepId.slice(-1)}`);
+            progress.style.width = '0%';
+
+            const timing = document.getElementById(`timing${stepId.slice(-1)}`);
+            timing.textContent = '';
+        });
+    }
+
+    showSection(sectionId) {
+        const sections = ['apiKeySection', 'uploadSection', 'processingSection', 'resultsSection', 'previewSection', 'errorSection'];
+
+        sections.forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                element.style.display = id === sectionId ? 'block' : 'none';
+            }
+        });
+    }
+
+    showCorrectSection() {
+        if (this.apiKey && this.apiKey !== '') {
+            this.showSection('uploadSection');
+        } else {
+            this.showSection('apiKeySection');
+        }
+    }
+
+    formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    generateJobId() {
+        return 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+}
+
+// Initialize app when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Configure PDF.js worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Initialize OCR App
+    window.ocrApp = new OCRApp();
+
+    console.log('🎯 OCR Application ready!');
 });
