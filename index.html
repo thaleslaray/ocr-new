@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor PDF para Markdown - OCR IA</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-file-pdf"></i> Conversor PDF para Markdown</h1>
+            <p>Converta documentos PDF e imagens para Markdown usando OCR com IA</p>
+
+            <!-- Trust Indicators -->
+            <div class="trust-indicators">
+                <div class="trust-item">
+                    <i class="fas fa-shield-check"></i>
+                    <span>95%+ Precisão</span>
+                </div>
+                <div class="trust-item">
+                    <i class="fas fa-bolt"></i>
+                    <span>Processamento Rápido</span>
+                </div>
+                <div class="trust-item">
+                    <i class="fas fa-lock"></i>
+                    <span>100% Seguro</span>
+                </div>
+                <div class="trust-item">
+                    <i class="fas fa-cloud"></i>
+                    <span>Powered by Mistral AI</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="main">
+            <!-- API Key Section -->
+            <section class="api-key-section" id="apiKeySection">
+                <div class="card">
+                    <h2><i class="fas fa-key"></i> Configuração da API</h2>
+                    <div class="info-banner">
+                        <i class="fas fa-info-circle"></i>
+                        <span>A chave da API é salva apenas no seu navegador e nunca enviada para nossos servidores.</span>
+                    </div>
+                    <div class="input-group">
+                        <label for="apiKey">Chave da API Mistral:</label>
+                        <div class="input-with-button">
+                            <input type="password" id="apiKey" placeholder="Cole sua chave da API Mistral aqui">
+                            <button type="button" id="toggleApiKey" class="btn-icon">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small class="help-text">
+                            Obtenha sua chave da API no <a href="https://console.mistral.ai/" target="_blank">Console Mistral</a>
+                        </small>
+                    </div>
+                    <div class="api-actions">
+                        <button type="button" class="btn btn-primary" id="saveApiKey">
+                            <i class="fas fa-save"></i> Salvar Chave
+                        </button>
+                        <button type="button" class="btn btn-outline" id="testMode">
+                            <i class="fas fa-flask"></i> Usar Modo Teste
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Upload Section -->
+            <section class="upload-section" id="uploadSection">
+                <div class="card">
+                    <h2><i class="fas fa-upload"></i> Enviar Documento</h2>
+
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-content">
+                            <i class="fas fa-cloud-upload-alt upload-icon"></i>
+                            <p>Arraste e solte seu arquivo PDF ou imagem aqui</p>
+                            <p class="upload-or">ou</p>
+                            <button type="button" class="btn btn-primary" id="selectFileBtn">
+                                <i class="fas fa-folder-open"></i> Selecionar Arquivo
+                            </button>
+                            <input type="file" id="fileInput" accept=".pdf,.png,.jpg,.jpeg,.webp,.bmp,.tiff" style="display: none;">
+                        </div>
+                    </div>
+
+                    <div class="file-info" id="fileInfo" style="display: none;">
+                        <div class="file-details">
+                            <i class="fas fa-file-pdf file-icon"></i>
+                            <div class="file-text">
+                                <span class="file-name" id="fileName"></span>
+                                <span class="file-size" id="fileSize"></span>
+                            </div>
+                            <button type="button" class="btn-icon btn-remove" id="removeFile">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="cost-display" id="costDisplay" style="display: none;">
+                            <div class="cost-card">
+                                <h4><i class="fas fa-calculator"></i> Custo do Processamento</h4>
+                                <div class="cost-details">
+                                    <div class="cost-item">
+                                        <span class="cost-label">Páginas:</span>
+                                        <span class="cost-value" id="pageCount">-</span>
+                                    </div>
+                                    <div class="cost-item">
+                                        <span class="cost-label">USD:</span>
+                                        <span class="cost-value" id="costUSD">-</span>
+                                    </div>
+                                    <div class="cost-item">
+                                        <span class="cost-label">BRL:</span>
+                                        <span class="cost-value" id="costBRL">-</span>
+                                    </div>
+                                </div>
+
+                                <div class="value-comparison" id="valueComparison" style="display: none;">
+                                    <div class="comparison-header">
+                                        <i class="fas fa-chart-line"></i> Economia vs Digitação Manual
+                                    </div>
+                                    <div class="comparison-stats">
+                                        <div class="stat">
+                                            <span class="stat-value" id="timeSaved">-</span>
+                                            <span class="stat-label">Tempo Economizado</span>
+                                        </div>
+                                        <div class="stat">
+                                            <span class="stat-value" id="costSaved">-</span>
+                                            <span class="stat-label">Economia vs Freelancer</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="cost-loading" id="costLoading">
+                                    <i class="fas fa-spinner fa-spin"></i> Calculando custo...
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="upload-actions" id="uploadActions" style="display: none;">
+                        <button type="button" class="btn btn-success" id="processBtn">
+                            <i class="fas fa-rocket"></i> Processar Documento
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Processing Section -->
+            <section class="processing-section" id="processingSection" style="display: none;">
+                <div class="card">
+                    <h2><i class="fas fa-cogs"></i> Status do Processamento</h2>
+
+                    <div class="processing-steps">
+                        <div class="step" id="step1">
+                            <div class="step-icon">
+                                <i class="fas fa-upload"></i>
+                                <i class="fas fa-spinner fa-spin step-spinner" style="display: none;"></i>
+                            </div>
+                            <div class="step-content">
+                                <h4>1. Enviando Arquivo</h4>
+                                <p>Fazendo upload e preparando para processamento...</p>
+                                <div class="step-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress1"></div>
+                                    </div>
+                                </div>
+                                <div class="step-timing" id="timing1"></div>
+                            </div>
+                        </div>
+
+                        <div class="step" id="step2">
+                            <div class="step-icon">
+                                <i class="fas fa-eye"></i>
+                                <i class="fas fa-spinner fa-spin step-spinner" style="display: none;"></i>
+                            </div>
+                            <div class="step-content">
+                                <h4>2. Processamento OCR</h4>
+                                <p>Extraindo texto com IA...</p>
+                                <div class="step-progress">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress2"></div>
+                                    </div>
+                                </div>
+                                <div class="step-timing" id="timing2"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress-summary">
+                        <div class="total-time">
+                            <strong>Tempo Total: <span id="totalTime">--</span></strong>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section" id="resultsSection" style="display: none;">
+                <div class="card">
+                    <h2><i class="fas fa-check-circle"></i> Processamento Concluído</h2>
+
+                    <div class="results-actions">
+                        <button type="button" class="btn btn-primary" id="downloadBtn">
+                            <i class="fas fa-download"></i> Baixar Markdown
+                        </button>
+                        <button type="button" class="btn btn-secondary" id="previewBtn">
+                            <i class="fas fa-eye"></i> Visualizar
+                        </button>
+                        <button type="button" class="btn btn-outline" id="newFileBtn">
+                            <i class="fas fa-plus"></i> Processar Outro Arquivo
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Preview Section -->
+            <section class="preview-section" id="previewSection" style="display: none;">
+                <div class="card">
+                    <div class="preview-header">
+                        <h2><i class="fas fa-file-alt"></i> Visualização do Markdown</h2>
+                        <button type="button" class="btn btn-icon" id="closePreview">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+
+                    <div class="preview-content">
+                        <div class="markdown-preview" id="markdownPreview"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section class="error-section" id="errorSection" style="display: none;">
+                <div class="card error-card">
+                    <h2><i class="fas fa-exclamation-triangle"></i> Erro no Processamento</h2>
+                    <div class="error-message" id="errorMessage"></div>
+                    <div class="error-actions">
+                        <button type="button" class="btn btn-primary" id="retryBtn">
+                            <i class="fas fa-redo"></i> Tentar Novamente
+                        </button>
+                        <button type="button" class="btn btn-outline" id="newFileErrorBtn">
+                            <i class="fas fa-plus"></i> Selecionar Novo Arquivo
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2024 PDF to Markdown OCR. Powered by Mistral AI & Cloudflare.</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
