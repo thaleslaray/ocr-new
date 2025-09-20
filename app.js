@@ -5,6 +5,7 @@ class OCRApp {
         this.currentFile = null;
         this.currentJobId = null;
         this.exchangeRate = 5.5; // Default USD to BRL
+        this.isCodeView = false;
 
         this.init();
     }
@@ -55,6 +56,7 @@ class OCRApp {
 
         // Preview
         document.getElementById('closePreview').addEventListener('click', this.closePreview.bind(this));
+        document.getElementById('toggleView').addEventListener('click', this.toggleView.bind(this));
 
         // Error Actions
         document.getElementById('retryBtn').addEventListener('click', this.processFile.bind(this));
@@ -455,10 +457,58 @@ Este é um exemplo de texto extraído usando OCR.
             return;
         }
 
+        // Configure marked for better table support
+        marked.setOptions({
+            gfm: true, // GitHub Flavored Markdown
+            tables: true,
+            breaks: false,
+            pedantic: false,
+            sanitize: false,
+            smartLists: true,
+            smartypants: false
+        });
+
+        // Setup rendered view
         const preview = document.getElementById('markdownPreview');
         preview.innerHTML = marked.parse(this.markdownContent);
 
+        // Setup raw code view
+        const rawCode = document.getElementById('markdownRaw');
+        rawCode.textContent = this.markdownContent;
+
+        // Reset to rendered view
+        this.isCodeView = false;
+        this.updateToggleButton();
+        this.updatePreviewDisplay();
         this.showSection('previewSection');
+    }
+
+    toggleView() {
+        this.isCodeView = !this.isCodeView;
+        this.updateToggleButton();
+        this.updatePreviewDisplay();
+    }
+
+    updateToggleButton() {
+        const toggleBtn = document.getElementById('toggleView');
+        if (this.isCodeView) {
+            toggleBtn.innerHTML = '<i class="fas fa-eye"></i> Ver Renderizado';
+        } else {
+            toggleBtn.innerHTML = '<i class="fas fa-code"></i> Ver Código';
+        }
+    }
+
+    updatePreviewDisplay() {
+        const preview = document.getElementById('markdownPreview');
+        const code = document.getElementById('markdownCode');
+
+        if (this.isCodeView) {
+            preview.style.display = 'none';
+            code.style.display = 'block';
+        } else {
+            preview.style.display = 'block';
+            code.style.display = 'none';
+        }
     }
 
     closePreview() {

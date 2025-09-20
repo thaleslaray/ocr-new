@@ -12,7 +12,7 @@ body {
 }
 
 .container {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 20px;
 }
@@ -425,8 +425,8 @@ body {
 
 .step.active {
     opacity: 1;
-    border-color: #667eea;
-    background: #f8f9ff;
+    border-color: #FF0030;
+    background: #fff0f2;
 }
 
 .step.completed {
@@ -570,13 +570,126 @@ body {
     flex: 1;
 }
 
+.preview-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
 .markdown-preview {
-    max-height: 500px;
+    max-height: 70vh;
     overflow-y: auto;
+    overflow-x: auto;
     border: 1px solid #ddd;
     border-radius: 8px;
     padding: 20px;
     background: #f8f9fa;
+}
+
+
+/* Markdown content styling */
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.markdown-preview h1 { border-bottom: 1px solid #eaecef; padding-bottom: 10px; }
+.markdown-preview h2 { border-bottom: 1px solid #eaecef; padding-bottom: 8px; }
+
+.markdown-preview table {
+    border-spacing: 0;
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+    font-size: 0.85rem;
+    display: table;
+    table-layout: auto;
+}
+
+.markdown-preview table th,
+.markdown-preview table td {
+    padding: 8px 12px;
+    border: 1px solid #dfe2e5;
+    text-align: left;
+    vertical-align: top;
+    min-width: 100px;
+    max-width: 250px;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.markdown-preview table th {
+    font-weight: 600;
+    background-color: #f6f8fa;
+    font-size: 0.8rem;
+}
+
+.markdown-preview table tr {
+    background-color: #fff;
+    border-top: 1px solid #c6cbd1;
+}
+
+.markdown-preview table tr:nth-child(2n) {
+    background-color: #f6f8fa;
+}
+
+.markdown-preview p {
+    margin-bottom: 16px;
+}
+
+.markdown-preview blockquote {
+    padding: 0 16px;
+    color: #6a737d;
+    border-left: 0.25em solid #dfe2e5;
+    margin: 16px 0;
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+    padding-left: 32px;
+    margin: 16px 0;
+}
+
+.markdown-preview code {
+    padding: 2px 4px;
+    margin: 0;
+    font-size: 85%;
+    background-color: rgba(27,31,35,0.05);
+    border-radius: 3px;
+}
+
+.markdown-code {
+    max-height: 70vh;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+.markdown-code pre {
+    margin: 0;
+    padding: 20px;
+    background: #2d3748;
+    color: #e2e8f0;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.markdown-code code {
+    background: none;
+    color: inherit;
+    padding: 0;
 }
 
 /* Error */
