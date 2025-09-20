@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../../../../.wrangler/tmp/pages-jwLlXr/functionsWorker-0.07143357457969435.mjs
+// ../../../../.wrangler/tmp/pages-nwR3f8/functionsWorker-0.2673311898216.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 async function onRequestPost(context) {
@@ -27,17 +27,18 @@ async function onRequestPost(context) {
     }
     const formData = await request.formData();
     const file = formData.get("file");
+    const chunkInfoStr = formData.get("chunk_info");
+    let chunkInfo = null;
+    if (chunkInfoStr) {
+      try {
+        chunkInfo = JSON.parse(chunkInfoStr);
+        console.log("\u{1F4E6} Processing chunk:", chunkInfo);
+      } catch (e) {
+        console.warn("Failed to parse chunk info:", e);
+      }
+    }
     if (!file) {
       return new Response(JSON.stringify({ error: "Nenhum arquivo enviado" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return new Response(JSON.stringify({
-        error: "Arquivo muito grande. Limite m\xE1ximo: 50MB"
-      }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" }
       });
@@ -81,20 +82,52 @@ async function onRequestPost(context) {
     console.log(`\u2705 URL generated in ${urlTime}ms`);
     console.log("\u{1F50D} Step 3/3: Processing with OCR (this may take a while)...");
     const ocrStart = Date.now();
+    const imageAnnotationSchema = {
+      type: "json_schema",
+      json_schema: {
+        name: "ImageAnnotation",
+        description: "Detailed image annotation that adapts to the document's language",
+        schema: {
+          type: "object",
+          properties: {
+            image_type: {
+              type: "string",
+              description: "Type of image in the same language as the document: chart, table, figure, diagram, photo, schema, flowchart, etc."
+            },
+            short_description: {
+              type: "string",
+              description: "Short and objective description of the image in the same language as the document (maximum 100 characters)"
+            },
+            summary: {
+              type: "string",
+              description: "Detailed summary of visual content, data, text and important elements of the image in the same language as the document"
+            }
+          },
+          required: ["image_type", "short_description", "summary"],
+          additionalProperties: false
+        },
+        strict: false
+      }
+    };
+    const ocrRequestBody = {
+      model: "mistral-ocr-latest",
+      document: {
+        type: "document_url",
+        document_url: signedUrl
+      },
+      include_image_base64: true,
+      bbox_annotation_format: imageAnnotationSchema
+    };
+    if (chunkInfo && chunkInfo.isChunked) {
+      console.log(`\u{1F4C4} Processing chunk ${chunkInfo.chunkNumber}/${chunkInfo.totalChunks} (simulated range: pages ${chunkInfo.startPage}-${chunkInfo.endPage})`);
+    }
     const ocrResponse = await fetch("https://api.mistral.ai/v1/ocr", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({
-        model: "mistral-ocr-latest",
-        document: {
-          type: "document_url",
-          document_url: signedUrl
-        },
-        include_image_base64: true
-      })
+      body: JSON.stringify(ocrRequestBody)
     });
     if (!ocrResponse.ok) {
       const errorText = await ocrResponse.text();
@@ -108,12 +141,67 @@ async function onRequestPost(context) {
     console.log("\u{1F4CB} OCR Result from Mistral:", JSON.stringify(ocrResult, null, 2));
     let markdownContent = "";
     if (ocrResult.pages && ocrResult.pages.length > 0) {
-      markdownContent = ocrResult.pages.map((page) => page.markdown || "").join("\n\n---\n\n");
+      const firstPageText = (ocrResult.pages[0]?.markdown || "").toLowerCase();
+      const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
+      const spanishMarkers = (firstPageText.match(/\b(que|con|una|del|los|las|por|para|son|está|fueron|tiene|será|puede|debe)\b/g) || []).length;
+      const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve)\b/g) || []).length;
+      const frenchMarkers = (firstPageText.match(/\b(que|avec|une|des|les|pour|sont|était|étaient|ont|sera|peut|doit)\b/g) || []).length;
+      console.log(`Language markers - EN: ${englishMarkers}, ES: ${spanishMarkers}, PT: ${portugueseMarkers}, FR: ${frenchMarkers}`);
+      let pageLabel, visualContentHeader, detectedLang;
+      if (englishMarkers >= spanishMarkers && englishMarkers >= portugueseMarkers && englishMarkers >= frenchMarkers && englishMarkers > 0) {
+        pageLabel = "PAGE";
+        visualContentHeader = "VISUAL CONTENT IDENTIFIED:";
+        detectedLang = "English";
+      } else if (spanishMarkers > englishMarkers && spanishMarkers >= portugueseMarkers && spanishMarkers >= frenchMarkers) {
+        pageLabel = "P\xC1GINA";
+        visualContentHeader = "CONTENIDO VISUAL IDENTIFICADO:";
+        detectedLang = "Spanish";
+      } else if (frenchMarkers > englishMarkers && frenchMarkers > spanishMarkers && frenchMarkers >= portugueseMarkers) {
+        pageLabel = "PAGE";
+        visualContentHeader = "CONTENU VISUEL IDENTIFI\xC9:";
+        detectedLang = "French";
+      } else {
+        pageLabel = "P\xC1GINA";
+        visualContentHeader = "CONTE\xDADO VISUAL IDENTIFICADO:";
+        detectedLang = "Portuguese (default)";
+      }
+      console.log(`Detected language: ${detectedLang}`);
+      markdownContent = ocrResult.pages.map((page, index) => {
+        const pageNumber = index + 1;
+        let pageContent = `# \u{1F4C4} ${pageLabel} ${pageNumber}
+
+`;
+        pageContent += page.markdown || "";
+        pageContent = pageContent.replace(/!\[img-\d+\.(jpeg|jpg|png|gif|webp)\]\(img-\d+\.(jpeg|jpg|png|gif|webp)\)/g, "");
+        if (page.images && page.images.length > 0) {
+          const imageDescriptions = page.images.filter((img) => img.image_annotation).map((img) => {
+            try {
+              const annotation = typeof img.image_annotation === "string" ? JSON.parse(img.image_annotation) : img.image_annotation;
+              return `**[${annotation.image_type.toUpperCase()}]** ${annotation.short_description}
+
+${annotation.summary}`;
+            } catch (e) {
+              console.log("Erro ao processar anota\xE7\xE3o da imagem:", e);
+              return `**[IMAGEM]** ${img.image_annotation}`;
+            }
+          });
+          if (imageDescriptions.length > 0) {
+            pageContent += `
+
+---
+
+**${visualContentHeader}**
+
+` + imageDescriptions.join("\n\n---\n\n");
+          }
+        }
+        return pageContent;
+      }).join("\n\n" + "=".repeat(80) + "\n\n");
       console.log(`\u{1F4C4} Extracted ${ocrResult.pages.length} pages of content`);
     } else {
       markdownContent = ocrResult.content || ocrResult.text || ocrResult.markdown || JSON.stringify(ocrResult, null, 2);
     }
-    return new Response(JSON.stringify({
+    const response = {
       success: true,
       markdown: markdownContent,
       filename: file.name,
@@ -129,7 +217,12 @@ async function onRequestPost(context) {
         fileSize: file.size,
         usage: ocrResult.usage_info
       }
-    }), {
+    };
+    if (chunkInfo) {
+      response.chunkInfo = chunkInfo;
+      response.isChunked = true;
+    }
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, "Content-Type": "application/json" }
     });
   } catch (error) {
@@ -837,7 +930,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-xWJK2t/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-ZZAt42/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -869,7 +962,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-xWJK2t/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-ZZAt42/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -969,4 +1062,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.07143357457969435.js.map
+//# sourceMappingURL=functionsWorker-0.2673311898216.js.map

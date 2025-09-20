@@ -106,26 +106,26 @@ export async function onRequestPost(context) {
     console.log('🔍 Step 3/3: Processing with OCR (this may take a while)...');
     const ocrStart = Date.now();
 
-    // Schema para anotações de imagem em português
+    // Schema para anotações de imagem que adapta ao idioma do documento
     const imageAnnotationSchema = {
       type: "json_schema",
       json_schema: {
         name: "ImageAnnotation",
-        description: "Anotação detalhada de imagem em português brasileiro",
+        description: "Detailed image annotation that adapts to the document's language",
         schema: {
           type: "object",
           properties: {
             image_type: {
               type: "string",
-              description: "Tipo da imagem: gráfico, tabela, figura, diagrama, foto, esquema, fluxograma, etc."
+              description: "Type of image in the same language as the document: chart, table, figure, diagram, photo, schema, flowchart, etc."
             },
             short_description: {
               type: "string",
-              description: "Descrição curta e objetiva da imagem em português (máximo 100 caracteres)"
+              description: "Short and objective description of the image in the same language as the document (maximum 100 characters)"
             },
             summary: {
               type: "string",
-              description: "Resumo detalhado do conteúdo visual, dados, texto e elementos importantes da imagem em português"
+              description: "Detailed summary of visual content, data, text and important elements of the image in the same language as the document"
             }
           },
           required: ["image_type", "short_description", "summary"],
@@ -177,10 +177,44 @@ export async function onRequestPost(context) {
     // Extract content from Mistral response - it comes in pages array
     let markdownContent = '';
     if (ocrResult.pages && ocrResult.pages.length > 0) {
+      // Simple but effective language detection using distinctive words
+      const firstPageText = (ocrResult.pages[0]?.markdown || '').toLowerCase();
+
+      // Count distinctive words that rarely appear in other languages
+      const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
+      const spanishMarkers = (firstPageText.match(/\b(que|con|una|del|los|las|por|para|son|está|fueron|tiene|será|puede|debe)\b/g) || []).length;
+      const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve)\b/g) || []).length;
+      const frenchMarkers = (firstPageText.match(/\b(que|avec|une|des|les|pour|sont|était|étaient|ont|sera|peut|doit)\b/g) || []).length;
+
+      console.log(`Language markers - EN: ${englishMarkers}, ES: ${spanishMarkers}, PT: ${portugueseMarkers}, FR: ${frenchMarkers}`);
+
+      // Determine language based on strongest markers
+      let pageLabel, visualContentHeader, detectedLang;
+
+      if (englishMarkers >= spanishMarkers && englishMarkers >= portugueseMarkers && englishMarkers >= frenchMarkers && englishMarkers > 0) {
+        pageLabel = 'PAGE';
+        visualContentHeader = 'VISUAL CONTENT IDENTIFIED:';
+        detectedLang = 'English';
+      } else if (spanishMarkers > englishMarkers && spanishMarkers >= portugueseMarkers && spanishMarkers >= frenchMarkers) {
+        pageLabel = 'PÁGINA';
+        visualContentHeader = 'CONTENIDO VISUAL IDENTIFICADO:';
+        detectedLang = 'Spanish';
+      } else if (frenchMarkers > englishMarkers && frenchMarkers > spanishMarkers && frenchMarkers >= portugueseMarkers) {
+        pageLabel = 'PAGE';
+        visualContentHeader = 'CONTENU VISUEL IDENTIFIÉ:';
+        detectedLang = 'French';
+      } else {
+        pageLabel = 'PÁGINA';
+        visualContentHeader = 'CONTEÚDO VISUAL IDENTIFICADO:';
+        detectedLang = 'Portuguese (default)';
+      }
+
+      console.log(`Detected language: ${detectedLang}`);
+
       // Process each page and include image descriptions
       markdownContent = ocrResult.pages.map((page, index) => {
         const pageNumber = index + 1;
-        let pageContent = `# 📄 PÁGINA ${pageNumber}\n\n`;
+        let pageContent = `# 📄 ${pageLabel} ${pageNumber}\n\n`;
 
         // Add the actual page content
         pageContent += page.markdown || '';
@@ -206,7 +240,7 @@ export async function onRequestPost(context) {
             });
 
           if (imageDescriptions.length > 0) {
-            pageContent += '\n\n---\n\n**CONTEÚDO VISUAL IDENTIFICADO:**\n\n' + imageDescriptions.join('\n\n---\n\n');
+            pageContent += `\n\n---\n\n**${visualContentHeader}**\n\n` + imageDescriptions.join('\n\n---\n\n');
           }
         }
 

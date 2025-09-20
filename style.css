@@ -12,9 +12,18 @@ body {
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 800px;
     margin: 0 auto;
     padding: 20px;
+}
+
+/* Wide content specifically for preview */
+.preview-content {
+    width: 100vw;
+    max-width: 1200px;
+    margin-left: 50%;
+    transform: translateX(-50%);
+    position: relative;
 }
 
 .header {
