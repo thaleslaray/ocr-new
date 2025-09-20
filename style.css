@@ -17,8 +17,8 @@ body {
     padding: 20px;
 }
 
-/* Wide content specifically for preview */
-.preview-content {
+/* Wide layout for entire preview section */
+.preview-section .card {
     width: 100vw;
     max-width: 1200px;
     margin-left: 50%;
