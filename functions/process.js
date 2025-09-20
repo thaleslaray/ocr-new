@@ -102,8 +102,8 @@ export async function onRequestPost(context) {
     const urlTime = Date.now() - urlStart;
     console.log(`✅ URL generated in ${urlTime}ms`);
 
-    // Step 3: Process with OCR
-    console.log('🔍 Step 3/3: Processing with OCR (this may take a while)...');
+    // Step 3: Process with OCR (two-phase approach)
+    console.log('🔍 Step 3/4: Processing with OCR (language detection + image processing)...');
     const ocrStart = Date.now();
 
     // Create a simple image annotation schema for Portuguese (default)
@@ -167,7 +167,46 @@ export async function onRequestPost(context) {
       }
     };
 
-    // Prepare OCR request with Portuguese annotation schema (default)
+    // Step 3a: First OCR call to detect language (text only, faster)
+    console.log('🔍 Step 3a/4: Quick language detection...');
+    const languageDetectionRequest = {
+      model: 'mistral-ocr-latest',
+      document: {
+        type: 'document_url',
+        document_url: signedUrl
+      },
+      include_image_base64: false // Skip images for language detection
+    };
+
+    const languageResponse = await fetch('https://api.mistral.ai/v1/ocr', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(languageDetectionRequest)
+    });
+
+    if (!languageResponse.ok) {
+      const errorText = await languageResponse.text();
+      throw new Error(`Language detection failed: ${languageResponse.status} - ${errorText}`);
+    }
+
+    const languageResult = await languageResponse.json();
+
+    // Detect language from first page text
+    const firstPageText = (languageResult.pages?.[0]?.markdown || '').toLowerCase();
+    const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
+    const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde)\b/g) || []).length;
+
+    const minThreshold = 3;
+    const isEnglish = englishMarkers > minThreshold && englishMarkers > portugueseMarkers * 1.5;
+
+    console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}`);
+    console.log(`Detected language: ${isEnglish ? 'English' : 'Portuguese'}`);
+
+    // Step 3b: Second OCR call with correct schema for images
+    console.log('🔍 Step 3b/4: Processing with images and correct language schema...');
     const ocrRequestBody = {
       model: 'mistral-ocr-latest',
       document: {
@@ -175,7 +214,7 @@ export async function onRequestPost(context) {
         document_url: signedUrl
       },
       include_image_base64: true,
-      bbox_annotation_format: createImageAnnotationSchema(false) // Default to Portuguese
+      bbox_annotation_format: createImageAnnotationSchema(isEnglish)
     };
 
     // Note: Mistral OCR API doesn't support page_range parameter
@@ -209,34 +248,18 @@ export async function onRequestPost(context) {
     // Extract content from Mistral response - it comes in pages array
     let markdownContent = '';
     if (ocrResult.pages && ocrResult.pages.length > 0) {
-      // Simple but effective language detection using distinctive words
-      const firstPageText = (ocrResult.pages[0]?.markdown || '').toLowerCase();
-
-      // Count distinctive words for English and Portuguese only
-      const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
-      const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde)\b/g) || []).length;
-
-      console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}`);
-
-      // Determine language: English only if clear advantage, otherwise Portuguese
+      // Use previously detected language
       let pageLabel, visualContentHeader, detectedLang;
 
-      // Require at least 3 English markers and clear majority for English detection
-      const minThreshold = 3;
-      const englishAdvantage = englishMarkers > minThreshold && englishMarkers > portugueseMarkers * 1.5;
-
-      if (englishAdvantage) {
+      if (isEnglish) {
         pageLabel = 'PAGE';
         visualContentHeader = 'VISUAL CONTENT IDENTIFIED:';
         detectedLang = 'English';
       } else {
-        // Default to Portuguese
         pageLabel = 'PÁGINA';
         visualContentHeader = 'CONTEÚDO VISUAL IDENTIFICADO:';
         detectedLang = 'Portuguese';
       }
-
-      console.log(`Detected language: ${detectedLang}`);
 
       // Process each page and include image descriptions
       markdownContent = ocrResult.pages.map((page, index) => {
