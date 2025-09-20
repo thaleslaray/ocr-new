@@ -80,35 +80,98 @@ async function onRequestPost(context) {
     const signedUrl = urlResult.url;
     const urlTime = Date.now() - urlStart;
     console.log(`\u2705 URL generated in ${urlTime}ms`);
-    console.log("\u{1F50D} Step 3/3: Processing with OCR (this may take a while)...");
+    console.log("\u{1F50D} Step 3/4: Processing with OCR (language detection + image processing)...");
     const ocrStart = Date.now();
-    const imageAnnotationSchema = {
-      type: "json_schema",
-      json_schema: {
-        name: "ImageAnnotation",
-        description: "Detailed image annotation that adapts to the document's language",
-        schema: {
-          type: "object",
-          properties: {
-            image_type: {
-              type: "string",
-              description: "Type of image in the same language as the document: chart, table, figure, diagram, photo, schema, flowchart, etc."
+    const createImageAnnotationSchema = /* @__PURE__ */ __name2((isEnglish2 = false) => {
+      if (isEnglish2) {
+        return {
+          type: "json_schema",
+          json_schema: {
+            name: "ImageAnnotation",
+            description: "Detailed image annotation in English",
+            schema: {
+              type: "object",
+              properties: {
+                image_type: {
+                  type: "string",
+                  description: "Type of image in English: chart, table, figure, diagram, photo, schema, flowchart, etc."
+                },
+                short_description: {
+                  type: "string",
+                  description: "Short and objective description of the image in English (maximum 100 characters)"
+                },
+                summary: {
+                  type: "string",
+                  description: "Detailed summary of visual content, data, text and important elements of the image in English"
+                }
+              },
+              required: ["image_type", "short_description", "summary"],
+              additionalProperties: false
             },
-            short_description: {
-              type: "string",
-              description: "Short and objective description of the image in the same language as the document (maximum 100 characters)"
+            strict: false
+          }
+        };
+      } else {
+        return {
+          type: "json_schema",
+          json_schema: {
+            name: "ImageAnnotation",
+            description: "Anota\xE7\xE3o detalhada de imagem em portugu\xEAs brasileiro",
+            schema: {
+              type: "object",
+              properties: {
+                image_type: {
+                  type: "string",
+                  description: "Tipo da imagem em portugu\xEAs: gr\xE1fico, tabela, figura, diagrama, foto, esquema, fluxograma, etc."
+                },
+                short_description: {
+                  type: "string",
+                  description: "Descri\xE7\xE3o curta e objetiva da imagem em portugu\xEAs (m\xE1ximo 100 caracteres)"
+                },
+                summary: {
+                  type: "string",
+                  description: "Resumo detalhado do conte\xFAdo visual, dados, texto e elementos importantes da imagem em portugu\xEAs"
+                }
+              },
+              required: ["image_type", "short_description", "summary"],
+              additionalProperties: false
             },
-            summary: {
-              type: "string",
-              description: "Detailed summary of visual content, data, text and important elements of the image in the same language as the document"
-            }
-          },
-          required: ["image_type", "short_description", "summary"],
-          additionalProperties: false
-        },
-        strict: false
+            strict: false
+          }
+        };
       }
+    }, "createImageAnnotationSchema");
+    console.log("\u{1F50D} Step 3a/4: Quick language detection...");
+    const languageDetectionRequest = {
+      model: "mistral-ocr-latest",
+      document: {
+        type: "document_url",
+        document_url: signedUrl
+      },
+      include_image_base64: false
+      // Skip images for language detection
     };
+    const languageResponse = await fetch("https://api.mistral.ai/v1/ocr", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(languageDetectionRequest)
+    });
+    if (!languageResponse.ok) {
+      const errorText = await languageResponse.text();
+      throw new Error(`Language detection failed: ${languageResponse.status} - ${errorText}`);
+    }
+    const languageResult = await languageResponse.json();
+    const firstPageText = (languageResult.pages?.[0]?.markdown || "").toLowerCase();
+    const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
+    const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde)\b/g) || []).length;
+    const minThreshold = 3;
+    const isEnglish = englishMarkers > minThreshold && englishMarkers > portugueseMarkers * 1.5;
+    console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}`);
+    console.log(`Detected language: ${isEnglish ? "English" : "Portuguese"}`);
+    console.log("\u{1F50D} Step 3b/4: Processing with images and correct language schema...");
     const ocrRequestBody = {
       model: "mistral-ocr-latest",
       document: {
@@ -116,7 +179,7 @@ async function onRequestPost(context) {
         document_url: signedUrl
       },
       include_image_base64: true,
-      bbox_annotation_format: imageAnnotationSchema
+      bbox_annotation_format: createImageAnnotationSchema(isEnglish)
     };
     if (chunkInfo && chunkInfo.isChunked) {
       console.log(`\u{1F4C4} Processing chunk ${chunkInfo.chunkNumber}/${chunkInfo.totalChunks} (simulated range: pages ${chunkInfo.startPage}-${chunkInfo.endPage})`);
@@ -141,62 +204,50 @@ async function onRequestPost(context) {
     console.log("\u{1F4CB} OCR Result from Mistral:", JSON.stringify(ocrResult, null, 2));
     let markdownContent = "";
     if (ocrResult.pages && ocrResult.pages.length > 0) {
-      const firstPageText = (ocrResult.pages[0]?.markdown || "").toLowerCase();
-      const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
-      const spanishMarkers = (firstPageText.match(/\b(que|con|una|del|los|las|por|para|son|está|fueron|tiene|será|puede|debe)\b/g) || []).length;
-      const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve)\b/g) || []).length;
-      const frenchMarkers = (firstPageText.match(/\b(que|avec|une|des|les|pour|sont|était|étaient|ont|sera|peut|doit)\b/g) || []).length;
-      console.log(`Language markers - EN: ${englishMarkers}, ES: ${spanishMarkers}, PT: ${portugueseMarkers}, FR: ${frenchMarkers}`);
       let pageLabel, visualContentHeader, detectedLang;
-      if (englishMarkers >= spanishMarkers && englishMarkers >= portugueseMarkers && englishMarkers >= frenchMarkers && englishMarkers > 0) {
+      if (isEnglish) {
         pageLabel = "PAGE";
         visualContentHeader = "VISUAL CONTENT IDENTIFIED:";
         detectedLang = "English";
-      } else if (spanishMarkers > englishMarkers && spanishMarkers >= portugueseMarkers && spanishMarkers >= frenchMarkers) {
-        pageLabel = "P\xC1GINA";
-        visualContentHeader = "CONTENIDO VISUAL IDENTIFICADO:";
-        detectedLang = "Spanish";
-      } else if (frenchMarkers > englishMarkers && frenchMarkers > spanishMarkers && frenchMarkers >= portugueseMarkers) {
-        pageLabel = "PAGE";
-        visualContentHeader = "CONTENU VISUEL IDENTIFI\xC9:";
-        detectedLang = "French";
       } else {
         pageLabel = "P\xC1GINA";
         visualContentHeader = "CONTE\xDADO VISUAL IDENTIFICADO:";
-        detectedLang = "Portuguese (default)";
+        detectedLang = "Portuguese";
       }
-      console.log(`Detected language: ${detectedLang}`);
       markdownContent = ocrResult.pages.map((page, index) => {
         const pageNumber = index + 1;
-        let pageContent = `# \u{1F4C4} ${pageLabel} ${pageNumber}
+        let pageContent = "";
+        if (index > 0) {
+          pageContent += "\n\n---\n\n";
+        }
+        pageContent += `## \u{1F4C4} ${pageLabel} ${pageNumber}
 
 `;
-        pageContent += page.markdown || "";
-        pageContent = pageContent.replace(/!\[img-\d+\.(jpeg|jpg|png|gif|webp)\]\(img-\d+\.(jpeg|jpg|png|gif|webp)\)/g, "");
+        let content = page.markdown || "";
+        content = content.replace(/!\[img-\d+\.(jpeg|jpg|png|gif|webp)\]\(img-\d+\.(jpeg|jpg|png|gif|webp)\)/g, "");
+        pageContent += content;
         if (page.images && page.images.length > 0) {
           const imageDescriptions = page.images.filter((img) => img.image_annotation).map((img) => {
             try {
               const annotation = typeof img.image_annotation === "string" ? JSON.parse(img.image_annotation) : img.image_annotation;
-              return `**[${annotation.image_type.toUpperCase()}]** ${annotation.short_description}
-
-${annotation.summary}`;
+              return `> **${annotation.image_type.toUpperCase()}:** ${annotation.short_description}
+>
+> ${annotation.summary}`;
             } catch (e) {
               console.log("Erro ao processar anota\xE7\xE3o da imagem:", e);
-              return `**[IMAGEM]** ${img.image_annotation}`;
+              return `> **IMAGE:** ${img.image_annotation}`;
             }
           });
           if (imageDescriptions.length > 0) {
             pageContent += `
 
----
+### ${visualContentHeader}
 
-**${visualContentHeader}**
-
-` + imageDescriptions.join("\n\n---\n\n");
+` + imageDescriptions.join("\n\n");
           }
         }
         return pageContent;
-      }).join("\n\n" + "=".repeat(80) + "\n\n");
+      }).join("\n\n");
       console.log(`\u{1F4C4} Extracted ${ocrResult.pages.length} pages of content`);
     } else {
       markdownContent = ocrResult.content || ocrResult.text || ocrResult.markdown || JSON.stringify(ocrResult, null, 2);
