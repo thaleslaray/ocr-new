@@ -188,22 +188,28 @@ export async function onRequestPost(context) {
 
       console.log(`Language markers - EN: ${englishMarkers}, ES: ${spanishMarkers}, PT: ${portugueseMarkers}, FR: ${frenchMarkers}`);
 
-      // Determine language based on strongest markers
+      // Determine language based on strongest markers with threshold for clear detection
       let pageLabel, visualContentHeader, detectedLang;
 
-      if (englishMarkers >= spanishMarkers && englishMarkers >= portugueseMarkers && englishMarkers >= frenchMarkers && englishMarkers > 0) {
+      // Require at least 3 markers and clear majority (50% more) for English detection
+      const minThreshold = 3;
+      const englishAdvantage = englishMarkers > minThreshold &&
+                               englishMarkers > (spanishMarkers + portugueseMarkers + frenchMarkers) * 1.5;
+
+      if (englishAdvantage) {
         pageLabel = 'PAGE';
         visualContentHeader = 'VISUAL CONTENT IDENTIFIED:';
         detectedLang = 'English';
-      } else if (spanishMarkers > englishMarkers && spanishMarkers >= portugueseMarkers && spanishMarkers >= frenchMarkers) {
+      } else if (spanishMarkers > englishMarkers && spanishMarkers >= portugueseMarkers && spanishMarkers >= frenchMarkers && spanishMarkers > 0) {
         pageLabel = 'PÁGINA';
         visualContentHeader = 'CONTENIDO VISUAL IDENTIFICADO:';
         detectedLang = 'Spanish';
-      } else if (frenchMarkers > englishMarkers && frenchMarkers > spanishMarkers && frenchMarkers >= portugueseMarkers) {
+      } else if (frenchMarkers > englishMarkers && frenchMarkers > spanishMarkers && frenchMarkers >= portugueseMarkers && frenchMarkers > 0) {
         pageLabel = 'PAGE';
         visualContentHeader = 'CONTENU VISUEL IDENTIFIÉ:';
         detectedLang = 'French';
       } else {
+        // Default to Portuguese for Brazilian interface context
         pageLabel = 'PÁGINA';
         visualContentHeader = 'CONTEÚDO VISUAL IDENTIFICADO:';
         detectedLang = 'Portuguese (default)';
