@@ -324,7 +324,7 @@ Este é um exemplo de texto extraído usando OCR.
         document.getElementById('totalTime').textContent = `${(totalTime / 1000).toFixed(1)}s`;
 
         setTimeout(() => {
-            this.showSection('resultsSection');
+            document.getElementById('resultsSection').style.display = 'block';
         }, 1000);
     }
 
@@ -372,7 +372,7 @@ Este é um exemplo de texto extraído usando OCR.
             document.getElementById('totalTime').textContent = `${(totalTime / 1000).toFixed(1)}s`;
 
             setTimeout(() => {
-                this.showSection('resultsSection');
+                document.getElementById('resultsSection').style.display = 'block';
             }, 1000);
 
         } catch (error) {

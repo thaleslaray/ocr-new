@@ -6,7 +6,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #ffffff;
     min-height: 100vh;
     color: #333;
 }
@@ -20,12 +20,18 @@ body {
 .header {
     text-align: center;
     margin-bottom: 40px;
-    color: white;
+    color: #333;
 }
 
 .header h1 {
     font-size: 2.5rem;
     margin-bottom: 10px;
+    text-align: center;
+}
+
+.header h1 i {
+    color: #FF0030;
+    margin-right: 8px;
 }
 
 .header p {
@@ -48,7 +54,7 @@ body {
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    color: white;
+    color: #666;
     font-size: 0.85rem;
     opacity: 0.9;
 }
@@ -81,8 +87,9 @@ body {
 
 /* API Key Section */
 .info-banner {
-    background: #e6f3ff;
-    color: #0066cc;
+    background: #f8f9fa;
+    color: #666;
+    border: 1px solid #ddd;
     padding: 12px 15px;
     border-radius: 6px;
     margin-bottom: 20px;
@@ -119,7 +126,7 @@ body {
 }
 
 .input-with-button input:focus {
-    border-color: #667eea;
+    border-color: #FF0030;
 }
 
 .input-with-button .btn-icon {
@@ -135,7 +142,7 @@ body {
 }
 
 .help-text a {
-    color: #667eea;
+    color: #FF0030;
     text-decoration: none;
 }
 
@@ -167,13 +174,13 @@ body {
 
 .upload-area:hover,
 .upload-area.dragover {
-    border-color: #667eea;
-    background-color: #f8f9ff;
+    border-color: #FF0030;
+    background-color: #f8f9fa;
 }
 
 .upload-icon {
     font-size: 3rem;
-    color: #667eea;
+    color: #FF0030;
     margin-bottom: 20px;
 }
 
@@ -337,12 +344,13 @@ body {
 }
 
 .btn-primary {
-    background: #667eea;
+    background: #FF0030;
     color: white;
+    border: 1px solid #FF0030;
 }
 
 .btn-primary:hover {
-    background: #5a6fd8;
+    background: #e6002a;
     transform: translateY(-1px);
 }
 
@@ -368,12 +376,12 @@ body {
 
 .btn-outline {
     background: transparent;
-    color: #667eea;
-    border: 2px solid #667eea;
+    color: #FF0030;
+    border: 2px solid #FF0030;
 }
 
 .btn-outline:hover {
-    background: #667eea;
+    background: #FF0030;
     color: white;
 }
 
@@ -448,7 +456,7 @@ body {
 }
 
 .step.active .step-icon {
-    background: #667eea;
+    background: #FF0030;
     color: white;
     animation: pulse 2s infinite;
 }
@@ -482,7 +490,7 @@ body {
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: #FF0030;
     border-radius: 4px;
     width: 0%;
     transition: width 0.3s ease;
@@ -511,9 +519,9 @@ body {
 }
 
 @keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(102, 126, 234, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+    0% { box-shadow: 0 0 0 0 rgba(255, 0, 48, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(255, 0, 48, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 0, 48, 0); }
 }
 
 .step-content {
@@ -533,7 +541,7 @@ body {
 
 .step-timing {
     font-size: 0.8rem;
-    color: #667eea;
+    color: #FF0030;
     font-weight: 600;
 }
 
@@ -586,10 +594,39 @@ body {
 
 /* Footer */
 .footer {
-    text-align: center;
     margin-top: 40px;
-    color: white;
+    color: #666;
     opacity: 0.8;
+    text-align: center;
+}
+
+.footer-text {
+    margin-bottom: 20px;
+}
+
+.footer-text p {
+    margin: 5px 0;
+    font-size: 0.9rem;
+}
+
+.footer-text a {
+    color: #FF0030;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.footer-text a:hover {
+    text-decoration: underline;
+}
+
+.footer-logo-container {
+    display: flex;
+    justify-content: center;
+}
+
+.footer-logo {
+    width: 180px;
+    height: auto;
 }
 
 /* Responsive */
