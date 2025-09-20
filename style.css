@@ -110,8 +110,8 @@ body {
 
 /* Chunking Notice */
 .chunking-notice {
-    background: #e3f2fd;
-    border: 1px solid #90caf9;
+    background: #f8f9fa;
+    border: 1px solid #ddd;
     border-radius: 8px;
     padding: 15px;
     margin: 15px 0;
@@ -125,19 +125,19 @@ body {
 }
 
 .chunking-notice i {
-    color: #1976d2;
+    color: #666;
     font-size: 1.2rem;
     margin-top: 2px;
 }
 
 .chunking-notice .notice-text strong {
-    color: #1976d2;
+    color: #333;
     display: block;
     margin-bottom: 5px;
 }
 
 .chunking-notice .notice-text p {
-    color: #1565c0;
+    color: #666;
     margin: 0;
     font-size: 0.9rem;
     line-height: 1.4;
@@ -184,18 +184,18 @@ body {
 }
 
 .notification.warning {
-    border-left-color: #ffc107;
-    background: #fffdf5;
+    border-left-color: #FF0030;
+    background: #fff5f5;
 }
 
 .notification.success {
-    border-left-color: #28a745;
-    background: #f5fff5;
+    border-left-color: #666;
+    background: #f8f9fa;
 }
 
 .notification.info {
-    border-left-color: #007bff;
-    background: #f5f9ff;
+    border-left-color: #666;
+    background: #f8f9fa;
 }
 
 .notification-icon {
@@ -208,15 +208,15 @@ body {
 }
 
 .notification.warning .notification-icon {
-    color: #ffc107;
+    color: #FF0030;
 }
 
 .notification.success .notification-icon {
-    color: #28a745;
+    color: #666;
 }
 
 .notification.info .notification-icon {
-    color: #007bff;
+    color: #666;
 }
 
 .notification-content {
@@ -269,15 +269,15 @@ body {
 }
 
 .notification.warning .notification-progress {
-    background: #ffc107;
+    background: #FF0030;
 }
 
 .notification.success .notification-progress {
-    background: #28a745;
+    background: #666;
 }
 
 .notification.info .notification-progress {
-    background: #007bff;
+    background: #666;
 }
 
 @keyframes slideInRight {
@@ -438,7 +438,7 @@ body {
 
 .cost-card h4 {
     margin: 0 0 12px 0;
-    color: #4c51bf;
+    color: #666;
     font-size: 0.9rem;
     display: flex;
     align-items: center;
@@ -474,7 +474,7 @@ body {
 
 .cost-loading {
     text-align: center;
-    color: #667eea;
+    color: #666;
     font-size: 0.85rem;
 }
 
@@ -491,7 +491,7 @@ body {
 
 .comparison-header {
     text-align: center;
-    color: #4c51bf;
+    color: #666;
     font-size: 0.9rem;
     font-weight: 600;
     margin-bottom: 12px;
@@ -519,7 +519,7 @@ body {
     display: block;
     font-size: 1rem;
     font-weight: 700;
-    color: #2f855a;
+    color: #333;
     margin-bottom: 4px;
 }
 
@@ -556,12 +556,12 @@ body {
 }
 
 .btn-success {
-    background: #28a745;
+    background: #6c757d;
     color: white;
 }
 
 .btn-success:hover {
-    background: #218838;
+    background: #5a6268;
     transform: translateY(-1px);
 }
 
@@ -632,12 +632,12 @@ body {
 
 .step.completed {
     opacity: 1;
-    border-color: #48bb78;
-    background: #f0fff4;
+    border-color: #666;
+    background: #f8f9fa;
 }
 
 .step.completed .step-icon {
-    background: #48bb78;
+    background: #666;
     color: white;
 }
 
