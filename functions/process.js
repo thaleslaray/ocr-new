@@ -261,18 +261,29 @@ export async function onRequestPost(context) {
         detectedLang = 'Portuguese';
       }
 
-      // Process each page and include image descriptions
+      // Process each page following academic markdown standards
       markdownContent = ocrResult.pages.map((page, index) => {
         const pageNumber = index + 1;
-        let pageContent = `## 📄 ${pageLabel} ${pageNumber}\n\n`;
 
-        // Add the actual page content
-        pageContent += page.markdown || '';
+        // Page separator following academic standards
+        let pageContent = '';
+        if (index > 0) {
+          // Add page break divider between pages (academic standard)
+          pageContent += '\n\n---\n\n';
+        }
+
+        // Page header as H2 (section level) following academic hierarchy
+        pageContent += `## 📄 ${pageLabel} ${pageNumber}\n\n`;
+
+        // Add the actual page content with proper spacing
+        let content = page.markdown || '';
 
         // Remove useless image references that LLMs can't see
-        pageContent = pageContent.replace(/!\[img-\d+\.(jpeg|jpg|png|gif|webp)\]\(img-\d+\.(jpeg|jpg|png|gif|webp)\)/g, '');
+        content = content.replace(/!\[img-\d+\.(jpeg|jpg|png|gif|webp)\]\(img-\d+\.(jpeg|jpg|png|gif|webp)\)/g, '');
 
-        // Add image descriptions if available
+        pageContent += content;
+
+        // Add image descriptions following academic formatting
         if (page.images && page.images.length > 0) {
           const imageDescriptions = page.images
             .filter(img => img.image_annotation)
@@ -282,20 +293,22 @@ export async function onRequestPost(context) {
                   ? JSON.parse(img.image_annotation)
                   : img.image_annotation;
 
-                return `**[${annotation.image_type.toUpperCase()}]** ${annotation.short_description}\n\n${annotation.summary}`;
+                // Format image descriptions as academic block quotes
+                return `> **${annotation.image_type.toUpperCase()}:** ${annotation.short_description}\n>\n> ${annotation.summary}`;
               } catch (e) {
                 console.log('Erro ao processar anotação da imagem:', e);
-                return `**[IMAGEM]** ${img.image_annotation}`;
+                return `> **IMAGE:** ${img.image_annotation}`;
               }
             });
 
           if (imageDescriptions.length > 0) {
-            pageContent += `\n\n---\n\n**${visualContentHeader}**\n\n` + imageDescriptions.join('\n\n---\n\n');
+            // Add visual content section following academic standards
+            pageContent += `\n\n### ${visualContentHeader}\n\n` + imageDescriptions.join('\n\n');
           }
         }
 
         return pageContent;
-      }).join('\n\n' + '='.repeat(80) + '\n\n');
+      }).join('\n\n');
 
       console.log(`📄 Extracted ${ocrResult.pages.length} pages of content`);
     } else {
