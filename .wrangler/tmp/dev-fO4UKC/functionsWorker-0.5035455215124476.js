@@ -1,7 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// ../../../../.wrangler/tmp/pages-nwR3f8/functionsWorker-0.2673311898216.mjs
+// ../../../../.wrangler/tmp/pages-KXqp61/functionsWorker-0.5035455215124476.mjs
 var __defProp2 = Object.defineProperty;
 var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
 async function onRequestPost(context) {
@@ -165,11 +165,13 @@ async function onRequestPost(context) {
     }
     const languageResult = await languageResponse.json();
     const firstPageText = (languageResult.pages?.[0]?.markdown || "").toLowerCase();
-    const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
-    const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde)\b/g) || []).length;
-    const minThreshold = 3;
-    const isEnglish = englishMarkers > minThreshold && englishMarkers > portugueseMarkers * 1.5;
-    console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}`);
+    const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which|will|can|all|each|other|some|what|time|very|when|much|new|now|only|its|who|get|may|way|day|man|work|life|right|down|call|first|after|back|see|good|water|long)\b/g) || []).length;
+    const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde|não|seu|sua|pela|pelo|até|sem|sobre|entre|depois|antes|ainda|também|já|só)\b/g) || []).length;
+    const totalMarkers = englishMarkers + portugueseMarkers;
+    const englishRatio = totalMarkers > 0 ? englishMarkers / totalMarkers : 0;
+    const isEnglish = englishRatio > 0.6 || englishMarkers >= 5 && englishMarkers > portugueseMarkers * 2;
+    console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}, Total: ${totalMarkers}`);
+    console.log(`English ratio: ${(englishRatio * 100).toFixed(1)}%`);
     console.log(`Detected language: ${isEnglish ? "English" : "Portuguese"}`);
     console.log("\u{1F50D} Step 3b/4: Processing with images and correct language schema...");
     const ocrRequestBody = {
@@ -981,7 +983,7 @@ var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx
 }, "jsonError");
 var middleware_miniflare3_json_error_default2 = jsonError2;
 
-// .wrangler/tmp/bundle-ZZAt42/middleware-insertion-facade.js
+// .wrangler/tmp/bundle-6qV6Km/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
   middleware_ensure_req_body_drained_default2,
   middleware_miniflare3_json_error_default2
@@ -1013,7 +1015,7 @@ function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__2, "__facade_invoke__");
 
-// .wrangler/tmp/bundle-ZZAt42/middleware-loader.entry.ts
+// .wrangler/tmp/bundle-6qV6Km/middleware-loader.entry.ts
 var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -1113,4 +1115,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default2 as default
 };
-//# sourceMappingURL=functionsWorker-0.2673311898216.js.map
+//# sourceMappingURL=functionsWorker-0.5035455215124476.js.map

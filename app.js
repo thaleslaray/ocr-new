@@ -65,13 +65,8 @@ class OCRApp {
 
     async fetchExchangeRate() {
         try {
-            // Use a CORS-friendly exchange rate API
-            const response = await fetch('https://api.fxratesapi.com/latest?base=USD&symbols=BRL', {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
+            // Use exchangerate-api.com (no CORS restrictions)
+            const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
 
             if (response.ok) {
                 const data = await response.json();
@@ -290,10 +285,10 @@ class OCRApp {
     }
 
     calculateValueComparison(pages, costBRL) {
-        // Assumptions for value calculation
-        const minutesPerPage = 5; // Time to manually transcribe one page
+        // Assumptions for value calculation (based on 2025 market research)
+        const minutesPerPage = 12; // Time to manually transcribe one page (including reading, formatting)
         const hoursToTranscribe = (pages * minutesPerPage) / 60;
-        const freelancerRatePerHour = 25; // R$ per hour for freelancer
+        const freelancerRatePerHour = 45; // R$ per hour for professional freelancer
 
         const freelancerCost = hoursToTranscribe * freelancerRatePerHour;
         const timeSaved = hoursToTranscribe;

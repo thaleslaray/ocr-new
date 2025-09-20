@@ -194,15 +194,24 @@ export async function onRequestPost(context) {
 
     const languageResult = await languageResponse.json();
 
-    // Detect language from first page text
+    // Detect language from first page text (improved algorithm)
     const firstPageText = (languageResult.pages?.[0]?.markdown || '').toLowerCase();
-    const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
-    const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde)\b/g) || []).length;
 
-    const minThreshold = 3;
-    const isEnglish = englishMarkers > minThreshold && englishMarkers > portugueseMarkers * 1.5;
+    // Expanded English markers (most common words)
+    const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which|will|can|all|each|other|some|what|time|very|when|much|new|now|only|its|who|get|may|way|day|man|work|life|right|down|call|first|after|back|see|good|water|long)\b/g) || []).length;
 
-    console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}`);
+    // Expanded Portuguese markers
+    const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde|não|seu|sua|pela|pelo|até|sem|sobre|entre|depois|antes|ainda|também|já|só)\b/g) || []).length;
+
+    // Improved detection logic
+    const totalMarkers = englishMarkers + portugueseMarkers;
+    const englishRatio = totalMarkers > 0 ? englishMarkers / totalMarkers : 0;
+
+    // Consider English if ratio > 0.6 or if English markers > 5 and significantly more than Portuguese
+    const isEnglish = (englishRatio > 0.6) || (englishMarkers >= 5 && englishMarkers > portugueseMarkers * 2);
+
+    console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}, Total: ${totalMarkers}`);
+    console.log(`English ratio: ${(englishRatio * 100).toFixed(1)}%`);
     console.log(`Detected language: ${isEnglish ? 'English' : 'Portuguese'}`);
 
     // Step 3b: Second OCR call with correct schema for images
