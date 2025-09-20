@@ -106,36 +106,68 @@ export async function onRequestPost(context) {
     console.log('🔍 Step 3/3: Processing with OCR (this may take a while)...');
     const ocrStart = Date.now();
 
-    // Schema para anotações de imagem que adapta ao idioma do documento
-    const imageAnnotationSchema = {
-      type: "json_schema",
-      json_schema: {
-        name: "ImageAnnotation",
-        description: "Detailed image annotation that adapts to the document's language",
-        schema: {
-          type: "object",
-          properties: {
-            image_type: {
-              type: "string",
-              description: "Type of image in the same language as the document: chart, table, figure, diagram, photo, schema, flowchart, etc."
+    // Create a simple image annotation schema for Portuguese (default)
+    const createImageAnnotationSchema = (isEnglish = false) => {
+      if (isEnglish) {
+        return {
+          type: "json_schema",
+          json_schema: {
+            name: "ImageAnnotation",
+            description: "Detailed image annotation in English",
+            schema: {
+              type: "object",
+              properties: {
+                image_type: {
+                  type: "string",
+                  description: "Type of image in English: chart, table, figure, diagram, photo, schema, flowchart, etc."
+                },
+                short_description: {
+                  type: "string",
+                  description: "Short and objective description of the image in English (maximum 100 characters)"
+                },
+                summary: {
+                  type: "string",
+                  description: "Detailed summary of visual content, data, text and important elements of the image in English"
+                }
+              },
+              required: ["image_type", "short_description", "summary"],
+              additionalProperties: false
             },
-            short_description: {
-              type: "string",
-              description: "Short and objective description of the image in the same language as the document (maximum 100 characters)"
+            strict: false
+          }
+        };
+      } else {
+        return {
+          type: "json_schema",
+          json_schema: {
+            name: "ImageAnnotation",
+            description: "Anotação detalhada de imagem em português brasileiro",
+            schema: {
+              type: "object",
+              properties: {
+                image_type: {
+                  type: "string",
+                  description: "Tipo da imagem em português: gráfico, tabela, figura, diagrama, foto, esquema, fluxograma, etc."
+                },
+                short_description: {
+                  type: "string",
+                  description: "Descrição curta e objetiva da imagem em português (máximo 100 caracteres)"
+                },
+                summary: {
+                  type: "string",
+                  description: "Resumo detalhado do conteúdo visual, dados, texto e elementos importantes da imagem em português"
+                }
+              },
+              required: ["image_type", "short_description", "summary"],
+              additionalProperties: false
             },
-            summary: {
-              type: "string",
-              description: "Detailed summary of visual content, data, text and important elements of the image in the same language as the document"
-            }
-          },
-          required: ["image_type", "short_description", "summary"],
-          additionalProperties: false
-        },
-        strict: false
+            strict: false
+          }
+        };
       }
     };
 
-    // Prepare OCR request
+    // Prepare OCR request with Portuguese annotation schema (default)
     const ocrRequestBody = {
       model: 'mistral-ocr-latest',
       document: {
@@ -143,7 +175,7 @@ export async function onRequestPost(context) {
         document_url: signedUrl
       },
       include_image_base64: true,
-      bbox_annotation_format: imageAnnotationSchema
+      bbox_annotation_format: createImageAnnotationSchema(false) // Default to Portuguese
     };
 
     // Note: Mistral OCR API doesn't support page_range parameter
@@ -180,39 +212,28 @@ export async function onRequestPost(context) {
       // Simple but effective language detection using distinctive words
       const firstPageText = (ocrResult.pages[0]?.markdown || '').toLowerCase();
 
-      // Count distinctive words that rarely appear in other languages
+      // Count distinctive words for English and Portuguese only
       const englishMarkers = (firstPageText.match(/\b(the|and|you|your|are|have|that|this|with|from|they|been|were|there|their|would|which)\b/g) || []).length;
-      const spanishMarkers = (firstPageText.match(/\b(que|con|una|del|los|las|por|para|son|está|fueron|tiene|será|puede|debe)\b/g) || []).length;
-      const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve)\b/g) || []).length;
-      const frenchMarkers = (firstPageText.match(/\b(que|avec|une|des|les|pour|sont|était|étaient|ont|sera|peut|doit)\b/g) || []).length;
+      const portugueseMarkers = (firstPageText.match(/\b(que|com|uma|dos|das|por|para|são|está|foram|têm|será|pode|deve|ter|ser|fazer|mais|muito|como|quando|onde)\b/g) || []).length;
 
-      console.log(`Language markers - EN: ${englishMarkers}, ES: ${spanishMarkers}, PT: ${portugueseMarkers}, FR: ${frenchMarkers}`);
+      console.log(`Language markers - EN: ${englishMarkers}, PT: ${portugueseMarkers}`);
 
-      // Determine language based on strongest markers with threshold for clear detection
+      // Determine language: English only if clear advantage, otherwise Portuguese
       let pageLabel, visualContentHeader, detectedLang;
 
-      // Require at least 3 markers and clear majority (50% more) for English detection
+      // Require at least 3 English markers and clear majority for English detection
       const minThreshold = 3;
-      const englishAdvantage = englishMarkers > minThreshold &&
-                               englishMarkers > (spanishMarkers + portugueseMarkers + frenchMarkers) * 1.5;
+      const englishAdvantage = englishMarkers > minThreshold && englishMarkers > portugueseMarkers * 1.5;
 
       if (englishAdvantage) {
         pageLabel = 'PAGE';
         visualContentHeader = 'VISUAL CONTENT IDENTIFIED:';
         detectedLang = 'English';
-      } else if (spanishMarkers > englishMarkers && spanishMarkers >= portugueseMarkers && spanishMarkers >= frenchMarkers && spanishMarkers > 0) {
-        pageLabel = 'PÁGINA';
-        visualContentHeader = 'CONTENIDO VISUAL IDENTIFICADO:';
-        detectedLang = 'Spanish';
-      } else if (frenchMarkers > englishMarkers && frenchMarkers > spanishMarkers && frenchMarkers >= portugueseMarkers && frenchMarkers > 0) {
-        pageLabel = 'PAGE';
-        visualContentHeader = 'CONTENU VISUEL IDENTIFIÉ:';
-        detectedLang = 'French';
       } else {
-        // Default to Portuguese for Brazilian interface context
+        // Default to Portuguese
         pageLabel = 'PÁGINA';
         visualContentHeader = 'CONTEÚDO VISUAL IDENTIFICADO:';
-        detectedLang = 'Portuguese (default)';
+        detectedLang = 'Portuguese';
       }
 
       console.log(`Detected language: ${detectedLang}`);
