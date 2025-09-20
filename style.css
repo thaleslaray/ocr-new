@@ -99,6 +99,198 @@ body {
     font-size: 0.9rem;
 }
 
+/* Chunking Notice */
+.chunking-notice {
+    background: #e3f2fd;
+    border: 1px solid #90caf9;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+    animation: slideIn 0.3s ease;
+}
+
+.chunking-notice .notice-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.chunking-notice i {
+    color: #1976d2;
+    font-size: 1.2rem;
+    margin-top: 2px;
+}
+
+.chunking-notice .notice-text strong {
+    color: #1976d2;
+    display: block;
+    margin-bottom: 5px;
+}
+
+.chunking-notice .notice-text p {
+    color: #1565c0;
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Custom Notification System */
+.notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    max-width: 400px;
+}
+
+.notification {
+    background: white;
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    border-left: 4px solid #ddd;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    animation: slideInRight 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.notification.error {
+    border-left-color: #dc3545;
+    background: #fff5f5;
+}
+
+.notification.warning {
+    border-left-color: #ffc107;
+    background: #fffdf5;
+}
+
+.notification.success {
+    border-left-color: #28a745;
+    background: #f5fff5;
+}
+
+.notification.info {
+    border-left-color: #007bff;
+    background: #f5f9ff;
+}
+
+.notification-icon {
+    font-size: 1.2rem;
+    margin-top: 1px;
+}
+
+.notification.error .notification-icon {
+    color: #dc3545;
+}
+
+.notification.warning .notification-icon {
+    color: #ffc107;
+}
+
+.notification.success .notification-icon {
+    color: #28a745;
+}
+
+.notification.info .notification-icon {
+    color: #007bff;
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #333;
+}
+
+.notification-message {
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.4;
+    margin: 0;
+}
+
+.notification-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.notification-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #666;
+}
+
+.notification-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: rgba(0, 0, 0, 0.1);
+    animation: progress 5s linear;
+}
+
+.notification.error .notification-progress {
+    background: #dc3545;
+}
+
+.notification.warning .notification-progress {
+    background: #ffc107;
+}
+
+.notification.success .notification-progress {
+    background: #28a745;
+}
+
+.notification.info .notification-progress {
+    background: #007bff;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes progress {
+    from {
+        width: 100%;
+    }
+    to {
+        width: 0%;
+    }
+}
+
 .input-group {
     margin-bottom: 20px;
 }

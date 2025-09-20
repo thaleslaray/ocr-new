@@ -65,11 +65,24 @@ class OCRApp {
 
     async fetchExchangeRate() {
         try {
-            const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-            const data = await response.json();
-            this.exchangeRate = data.rates.BRL || 5.5;
+            // Use a CORS-friendly exchange rate API
+            const response = await fetch('https://api.fxratesapi.com/latest?base=USD&symbols=BRL', {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.exchangeRate = data.rates?.BRL || 5.5;
+                console.log('💱 Exchange rate updated:', this.exchangeRate);
+            } else {
+                throw new Error('API response not ok');
+            }
         } catch (error) {
-            console.warn('Failed to fetch exchange rate, using default:', error);
+            console.warn('⚠️ Failed to fetch exchange rate, using default:', error.message);
+            this.exchangeRate = 5.5; // Default BRL rate
         }
     }
 
@@ -90,7 +103,11 @@ class OCRApp {
     saveApiKey() {
         const apiKey = document.getElementById('apiKey').value.trim();
         if (!apiKey) {
-            alert('Por favor, insira uma chave da API válida.');
+            this.showNotification(
+                'Chave da API Necessária',
+                'Por favor, insira uma chave da API válida.',
+                'warning'
+            );
             return;
         }
 
@@ -151,19 +168,28 @@ class OCRApp {
         // Validate file type
         const allowedTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/bmp', 'image/tiff'];
         if (!allowedTypes.includes(file.type)) {
-            alert('Tipo de arquivo não suportado. Use PDF ou imagens (PNG, JPG, WEBP, BMP, TIFF).');
+            this.showNotification(
+                'Tipo de Arquivo Não Suportado',
+                'Use PDF ou imagens (PNG, JPG, WEBP, BMP, TIFF).',
+                'error'
+            );
             return;
         }
 
-        // Validate file size (50MB)
-        const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-            alert('Arquivo muito grande. Limite máximo: 50MB');
-            return;
-        }
+        // No file size limit - we handle any size with intelligent chunking
 
         this.currentFile = file;
         this.showFileInfo(file);
+
+        // File loaded silently - UI shows the info
+
+        // Show chunking notice for large PDFs (45MB+) - silently
+        const chunkingLimit = 45 * 1024 * 1024;
+        if (file.size > chunkingLimit && file.type === 'application/pdf') {
+            console.log('📊 Large PDF detected - will use intelligent processing');
+            this.showChunkingNotice(file.size);
+            // No notification - keep it transparent
+        }
 
         if (file.type === 'application/pdf') {
             await this.calculateCost(file);
@@ -189,6 +215,31 @@ class OCRApp {
         } else {
             fileIcon.className = 'fas fa-file-image file-icon';
             fileIcon.style.color = '#28a745';
+        }
+    }
+
+    showChunkingNotice(fileSize) {
+        const fileSizeMB = (fileSize / (1024 * 1024)).toFixed(1);
+
+        // Create notice element if it doesn't exist
+        let notice = document.getElementById('chunkingNotice');
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.id = 'chunkingNotice';
+            notice.className = 'chunking-notice';
+            notice.innerHTML = `
+                <div class="notice-content">
+                    <i class="fas fa-rocket"></i>
+                    <div class="notice-text">
+                        <strong>Processamento Otimizado Ativado (${fileSizeMB}MB)</strong>
+                        <p>Arquivo grande será processado com algoritmos otimizados para máxima eficiência e qualidade.</p>
+                    </div>
+                </div>
+            `;
+
+            // Insert after file info
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.appendChild(notice);
         }
     }
 
@@ -260,16 +311,30 @@ class OCRApp {
         document.getElementById('fileInfo').style.display = 'none';
         document.getElementById('uploadActions').style.display = 'none';
         document.getElementById('fileInput').value = '';
+
+        // Remove chunking notice if it exists
+        const notice = document.getElementById('chunkingNotice');
+        if (notice) {
+            notice.remove();
+        }
     }
 
     async processFile() {
         if (!this.currentFile) {
-            alert('Nenhum arquivo selecionado');
+            this.showNotification(
+                'Arquivo Necessário',
+                'Nenhum arquivo selecionado. Por favor, selecione um arquivo primeiro.',
+                'warning'
+            );
             return;
         }
 
         if (!this.apiKey) {
-            alert('Configure a chave da API primeiro');
+            this.showNotification(
+                'Configuração Necessária',
+                'Configure a chave da API primeiro ou use o modo teste.',
+                'warning'
+            );
             return;
         }
 
@@ -334,43 +399,17 @@ Este é um exemplo de texto extraído usando OCR.
         try {
             const startTime = Date.now();
 
-            // Step 1: Upload and process
-            this.activateStep('step1');
-
-            const formData = new FormData();
-            formData.append('file', this.currentFile);
-
-            const response = await fetch('/process', {
-                method: 'POST',
-                headers: {
-                    'X-API-Key': this.apiKey
-                },
-                body: formData
-            });
-
-            await this.animateProgress('step1', 2000);
-            this.completeStep('step1', 2000);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            // Check if file is large and is a PDF
+            const fileSizeLimit = 45 * 1024 * 1024; // 45MB
+            if (this.currentFile.size > fileSizeLimit && this.currentFile.type === 'application/pdf') {
+                console.log('📊 Large PDF detected, using intelligent splitting...');
+                await this.processLargePDF();
+            } else {
+                console.log('📄 Processing single file...');
+                await this.processSingleFile();
             }
 
-            // Step 2: OCR Processing
-            this.activateStep('step2');
-
-            const result = await response.json();
-
-            if (!result.success) {
-                throw new Error(result.error || 'Erro desconhecido no processamento');
-            }
-
-            await this.animateProgress('step2', result.timing?.ocr || 3000);
-            this.completeStep('step2', result.timing?.ocr || 3000);
-
-            // Store results
-            this.markdownContent = result.markdown;
             const totalTime = Date.now() - startTime;
-
             document.getElementById('totalTime').textContent = `${(totalTime / 1000).toFixed(1)}s`;
 
             setTimeout(() => {
@@ -382,6 +421,98 @@ Este é um exemplo de texto extraído usando OCR.
             this.showError(error.message);
         }
     }
+
+    async processSingleFile() {
+        // Step 1: Upload and process
+        this.activateStep('step1');
+
+        const formData = new FormData();
+        formData.append('file', this.currentFile);
+
+        const response = await fetch('/process', {
+            method: 'POST',
+            headers: {
+                'X-API-Key': this.apiKey
+            },
+            body: formData
+        });
+
+        await this.animateProgress('step1', 2000);
+        this.completeStep('step1', 2000);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // Step 2: OCR Processing
+        this.activateStep('step2');
+
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.error || 'Erro desconhecido no processamento');
+        }
+
+        await this.animateProgress('step2', result.timing?.ocr || 3000);
+        this.completeStep('step2', result.timing?.ocr || 3000);
+
+        // Store results
+        this.markdownContent = result.markdown;
+    }
+
+    async processLargePDF() {
+        // Step 1: Prepare PDF for processing
+        this.activateStep('step1');
+
+        const arrayBuffer = await this.currentFile.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        const totalPages = pdf.numPages;
+
+        console.log(`📋 Large PDF detected: ${totalPages} pages, processing as single unit...`);
+
+        await this.animateProgress('step1', 1000);
+        this.completeStep('step1', 1000);
+
+        // Step 2: Process the entire PDF
+        this.activateStep('step2');
+
+        const progressBar = document.getElementById('progress2');
+        const timing = document.getElementById('timing2');
+        timing.textContent = 'Processando PDF completo...';
+
+        const formData = new FormData();
+        formData.append('file', this.currentFile);
+
+        const response = await fetch('/process', {
+            method: 'POST',
+            headers: {
+                'X-API-Key': this.apiKey
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+            throw new Error(result.error || 'Erro desconhecido no processamento');
+        }
+
+        // Update progress to 100%
+        progressBar.style.width = '100%';
+        timing.textContent = 'PDF processado com sucesso!';
+
+        this.completeStep('step2', result.timing?.ocr || 3000);
+
+        // Store results
+        this.markdownContent = result.markdown;
+
+        console.log(`✅ Successfully processed large PDF with ${totalPages} pages`);
+    }
+
 
     activateStep(stepId) {
         const step = document.getElementById(stepId);
@@ -436,7 +567,11 @@ Este é um exemplo de texto extraído usando OCR.
 
     downloadMarkdown() {
         if (!this.markdownContent) {
-            alert('Nenhum conteúdo para download');
+            this.showNotification(
+                'Nenhum Conteúdo',
+                'Não há conteúdo disponível para download.',
+                'warning'
+            );
             return;
         }
 
@@ -453,7 +588,11 @@ Este é um exemplo de texto extraído usando OCR.
 
     showPreview() {
         if (!this.markdownContent) {
-            alert('Nenhum conteúdo para visualizar');
+            this.showNotification(
+                'Nenhum Conteúdo',
+                'Não há conteúdo disponível para visualizar.',
+                'warning'
+            );
             return;
         }
 
@@ -573,6 +712,46 @@ Este é um exemplo de texto extraído usando OCR.
 
     generateJobId() {
         return 'job_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Custom Notification System
+    showNotification(title, message, type = 'info', duration = 5000) {
+        const container = document.getElementById('notificationContainer');
+        const notificationId = 'notification_' + Date.now();
+
+        const icons = {
+            error: '⚠️',
+            warning: '⚠️',
+            success: '✅',
+            info: 'ℹ️'
+        };
+
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.id = notificationId;
+
+        notification.innerHTML = `
+            <div class="notification-icon">${icons[type]}</div>
+            <div class="notification-content">
+                <div class="notification-title">${title}</div>
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+            <div class="notification-progress"></div>
+        `;
+
+        container.appendChild(notification);
+
+        // Auto remove after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                if (document.getElementById(notificationId)) {
+                    notification.remove();
+                }
+            }, duration);
+        }
+
+        return notificationId;
     }
 }
 

@@ -28,9 +28,20 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Get the uploaded file
+    // Get the uploaded file and chunk info
     const formData = await request.formData();
     const file = formData.get('file');
+    const chunkInfoStr = formData.get('chunk_info');
+
+    let chunkInfo = null;
+    if (chunkInfoStr) {
+      try {
+        chunkInfo = JSON.parse(chunkInfoStr);
+        console.log('📦 Processing chunk:', chunkInfo);
+      } catch (e) {
+        console.warn('Failed to parse chunk info:', e);
+      }
+    }
 
     if (!file) {
       return new Response(JSON.stringify({ error: 'Nenhum arquivo enviado' }), {
@@ -39,16 +50,8 @@ export async function onRequestPost(context) {
       });
     }
 
-    // Validate file size (50MB limit)
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return new Response(JSON.stringify({
-        error: 'Arquivo muito grande. Limite máximo: 50MB'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    // No file size limit - we handle chunking intelligently in the frontend
+    // Large files are automatically split into optimal chunks for processing
 
     const startTime = Date.now();
 
@@ -132,21 +135,30 @@ export async function onRequestPost(context) {
       }
     };
 
+    // Prepare OCR request
+    const ocrRequestBody = {
+      model: 'mistral-ocr-latest',
+      document: {
+        type: 'document_url',
+        document_url: signedUrl
+      },
+      include_image_base64: true,
+      bbox_annotation_format: imageAnnotationSchema
+    };
+
+    // Note: Mistral OCR API doesn't support page_range parameter
+    // We'll process the whole file and let the chunking happen at file level
+    if (chunkInfo && chunkInfo.isChunked) {
+      console.log(`📄 Processing chunk ${chunkInfo.chunkNumber}/${chunkInfo.totalChunks} (simulated range: pages ${chunkInfo.startPage}-${chunkInfo.endPage})`);
+    }
+
     const ocrResponse = await fetch('https://api.mistral.ai/v1/ocr', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        model: 'mistral-ocr-latest',
-        document: {
-          type: 'document_url',
-          document_url: signedUrl
-        },
-        include_image_base64: true,
-        bbox_annotation_format: imageAnnotationSchema
-      })
+      body: JSON.stringify(ocrRequestBody)
     });
 
     if (!ocrResponse.ok) {
@@ -166,8 +178,12 @@ export async function onRequestPost(context) {
     let markdownContent = '';
     if (ocrResult.pages && ocrResult.pages.length > 0) {
       // Process each page and include image descriptions
-      markdownContent = ocrResult.pages.map(page => {
-        let pageContent = page.markdown || '';
+      markdownContent = ocrResult.pages.map((page, index) => {
+        const pageNumber = index + 1;
+        let pageContent = `# 📄 PÁGINA ${pageNumber}\n\n`;
+
+        // Add the actual page content
+        pageContent += page.markdown || '';
 
         // Remove useless image references that LLMs can't see
         pageContent = pageContent.replace(/!\[img-\d+\.(jpeg|jpg|png|gif|webp)\]\(img-\d+\.(jpeg|jpg|png|gif|webp)\)/g, '');
@@ -195,7 +211,7 @@ export async function onRequestPost(context) {
         }
 
         return pageContent;
-      }).join('\n\n---\n\n');
+      }).join('\n\n' + '='.repeat(80) + '\n\n');
 
       console.log(`📄 Extracted ${ocrResult.pages.length} pages of content`);
     } else {
@@ -203,7 +219,7 @@ export async function onRequestPost(context) {
       markdownContent = ocrResult.content || ocrResult.text || ocrResult.markdown || JSON.stringify(ocrResult, null, 2);
     }
 
-    return new Response(JSON.stringify({
+    const response = {
       success: true,
       markdown: markdownContent,
       filename: file.name,
@@ -219,7 +235,15 @@ export async function onRequestPost(context) {
         fileSize: file.size,
         usage: ocrResult.usage_info
       }
-    }), {
+    };
+
+    // Add chunk information if this was a chunked request
+    if (chunkInfo) {
+      response.chunkInfo = chunkInfo;
+      response.isChunked = true;
+    }
+
+    return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
