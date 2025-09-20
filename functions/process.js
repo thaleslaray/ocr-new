@@ -264,7 +264,7 @@ export async function onRequestPost(context) {
       // Process each page and include image descriptions
       markdownContent = ocrResult.pages.map((page, index) => {
         const pageNumber = index + 1;
-        let pageContent = `# 📄 ${pageLabel} ${pageNumber}\n\n`;
+        let pageContent = `## 📄 ${pageLabel} ${pageNumber}\n\n`;
 
         // Add the actual page content
         pageContent += page.markdown || '';
