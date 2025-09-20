@@ -103,6 +103,35 @@ export async function onRequestPost(context) {
     console.log('🔍 Step 3/3: Processing with OCR (this may take a while)...');
     const ocrStart = Date.now();
 
+    // Schema para anotações de imagem em português
+    const imageAnnotationSchema = {
+      type: "json_schema",
+      json_schema: {
+        name: "ImageAnnotation",
+        description: "Anotação detalhada de imagem em português brasileiro",
+        schema: {
+          type: "object",
+          properties: {
+            image_type: {
+              type: "string",
+              description: "Tipo da imagem: gráfico, tabela, figura, diagrama, foto, esquema, fluxograma, etc."
+            },
+            short_description: {
+              type: "string",
+              description: "Descrição curta e objetiva da imagem em português (máximo 100 caracteres)"
+            },
+            summary: {
+              type: "string",
+              description: "Resumo detalhado do conteúdo visual, dados, texto e elementos importantes da imagem em português"
+            }
+          },
+          required: ["image_type", "short_description", "summary"],
+          additionalProperties: false
+        },
+        strict: false
+      }
+    };
+
     const ocrResponse = await fetch('https://api.mistral.ai/v1/ocr', {
       method: 'POST',
       headers: {
@@ -115,7 +144,8 @@ export async function onRequestPost(context) {
           type: 'document_url',
           document_url: signedUrl
         },
-        include_image_base64: true
+        include_image_base64: true,
+        bbox_annotation_format: imageAnnotationSchema
       })
     });
 
@@ -135,8 +165,38 @@ export async function onRequestPost(context) {
     // Extract content from Mistral response - it comes in pages array
     let markdownContent = '';
     if (ocrResult.pages && ocrResult.pages.length > 0) {
-      // Combine all pages
-      markdownContent = ocrResult.pages.map(page => page.markdown || '').join('\n\n---\n\n');
+      // Process each page and include image descriptions
+      markdownContent = ocrResult.pages.map(page => {
+        let pageContent = page.markdown || '';
+
+        // Remove useless image references that LLMs can't see
+        pageContent = pageContent.replace(/!\[img-\d+\.(jpeg|jpg|png|gif|webp)\]\(img-\d+\.(jpeg|jpg|png|gif|webp)\)/g, '');
+
+        // Add image descriptions if available
+        if (page.images && page.images.length > 0) {
+          const imageDescriptions = page.images
+            .filter(img => img.image_annotation)
+            .map(img => {
+              try {
+                const annotation = typeof img.image_annotation === 'string'
+                  ? JSON.parse(img.image_annotation)
+                  : img.image_annotation;
+
+                return `**[${annotation.image_type.toUpperCase()}]** ${annotation.short_description}\n\n${annotation.summary}`;
+              } catch (e) {
+                console.log('Erro ao processar anotação da imagem:', e);
+                return `**[IMAGEM]** ${img.image_annotation}`;
+              }
+            });
+
+          if (imageDescriptions.length > 0) {
+            pageContent += '\n\n---\n\n**CONTEÚDO VISUAL IDENTIFICADO:**\n\n' + imageDescriptions.join('\n\n---\n\n');
+          }
+        }
+
+        return pageContent;
+      }).join('\n\n---\n\n');
+
       console.log(`📄 Extracted ${ocrResult.pages.length} pages of content`);
     } else {
       // Fallback to other possible fields

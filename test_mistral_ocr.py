@@ -81,6 +81,35 @@ def test_mistral_ocr(file_path, api_key):
         print("🔍 Step 3/3: Processando OCR...")
         ocr_start = time.time()
 
+        # Schema para anotações de imagem em português
+        image_annotation_schema = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "ImageAnnotation",
+                "description": "Anotação detalhada de imagem em português brasileiro",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "image_type": {
+                            "type": "string",
+                            "description": "Tipo da imagem: gráfico, tabela, figura, diagrama, foto, esquema, fluxograma, etc."
+                        },
+                        "short_description": {
+                            "type": "string",
+                            "description": "Descrição curta e objetiva da imagem em português (máximo 100 caracteres)"
+                        },
+                        "summary": {
+                            "type": "string",
+                            "description": "Resumo detalhado do conteúdo visual, dados, texto e elementos importantes da imagem em português"
+                        }
+                    },
+                    "required": ["image_type", "short_description", "summary"],
+                    "additionalProperties": False
+                },
+                "strict": False
+            }
+        }
+
         ocr_response = requests.post(
             'https://api.mistral.ai/v1/ocr',
             headers={
@@ -93,7 +122,8 @@ def test_mistral_ocr(file_path, api_key):
                     'type': 'document_url',
                     'document_url': signed_url
                 },
-                'include_image_base64': True  # Para ver como lida com imagens
+                'include_image_base64': True,
+                'bbox_annotation_format': image_annotation_schema
             }
         )
 
